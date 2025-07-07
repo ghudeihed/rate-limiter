@@ -67,4 +67,34 @@ class RateLimiter:
         self.customers[customer_id] = (window_start, request_count + 1)
         return True
         
+# Example usage and testing
+if __name__ == "__main__":
+    # Create a rate limiter: 5 requests per 60 seconds
+    rate_limiter = RateLimiter(5, 60)
+    
+    print("=== Fixed Window Rate Limiter Example ===")
+    print("Rate: 5 requests per 60 seconds")
+    print()
+    
+    # Test the example from the requirements
+    test_times = [100, 110, 115, 120, 125, 130, 170]
+    customer_id = "user_123"
+    
+    for i, test_time in enumerate(test_times):
+        allowed = rate_limiter.is_allowed(customer_id, test_time) 
         
+        print(f"Request {i+1} at time {test_time}:")
+        print(f"  Allowed: {allowed}") 
+        print()
+    
+    # Test with multiple customers
+    print("=== Multiple Customers Test ===")
+    rate_limiter2 = RateLimiter(3, 30)  # 3 requests per 30 seconds
+    
+    customers = ["alice", "bob", "charlie"]
+    base_time = 200
+    
+    for i in range(5):
+        for customer in customers:
+            allowed = rate_limiter2.is_allowed(customer, base_time + i)
+            print(f"Time {base_time + i}, {customer}: {'Allowed' if allowed else 'Denied'}")
