@@ -1,7 +1,7 @@
-from datetime import datetime, date
+import time
 from typing import Dict, Tuple
 
-class RateLimiterFixedWindow:
+class RateLimiter:
     """Class that implements rate limiting with a fixed window algorithm."""
 
     def __init__(self, rate: int, time_window: int):
@@ -13,9 +13,18 @@ class RateLimiterFixedWindow:
         Raises:
             ValueError: if rate or time_window is not a positive integer
         """
-        pass
+        if not isinstance(rate, int) or rate <= 0:
+            raise ValueError("Rate must be a positive integer")
+        if not isinstance(time_window, int) or time_window <= 0:
+            raise ValueError("Time window must be a positive integer")
+        
+        self.rate = rate
+        self.time_window = time_window
+        
+        # Dictionary to store customer data: customer_id -> (window_start, request_count)
+        self.customers: Dict[str, Tuple[int, int]] = {}
     
-    def is_allowed(customer_id, current_time) -> bool: 
+    def is_allowed(self, customer_id: str, current_time: int) -> bool: 
         """ Checks if a request is allowed for a given customer at the current time.
 
         Args:
@@ -24,6 +33,38 @@ class RateLimiterFixedWindow:
         Returns:
             bool: true if the request is allowed, false if it should be rejected
         Raises:
-            ValueError: if customer_id is not a string or current_time is not a datetime object
+            ValueError: If customer_id is null or empty or current_time is not a positive integer
         """
-        pass
+        if not customer_id or not isinstance(customer_id, str):
+            raise ValueError("customer_id must be a non-empty string")
+        if not isinstance(current_time, int) or current_time < 0:
+            raise ValueError("current_time must be a non-negative integer")
+        
+        # Calculate the current window start time
+        current_window_start = (current_time // self.time_window) * self.time_window
+        
+        # Check if customer exists in our tracking
+        if customer_id not in self.customers:
+            # New customer - initialize with current window and first request
+            self.customers[customer_id] = (current_window_start, 1)
+            return True 
+        
+        # Get customer's current window data
+        window_start, request_count = self.customers[customer_id]
+        
+        # Check if we're in a new window
+        if current_window_start > window_start:
+            # New window has started, reset request count
+            self.customers[customer_id] = (current_window_start, 1)
+            return True
+        
+        # Same window - check request count
+        if request_count >= self.rate:
+            # Rate limit exceeded
+            return False
+        
+        # Within rate limit, increment request count
+        self.customers[customer_id] = (window_start, request_count + 1)
+        return True
+        
+        
