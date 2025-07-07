@@ -142,4 +142,27 @@ class TestRateLimiterTimeWindows:
         assert request_count == 3
         assert window_start == 90  # (90 // 30) * 30
     
-    
+    def test_time_rollovers_and_resets(self):
+        """Test various time rollover scenarios"""
+        customer_id = "user_123"
+
+        # First request
+        assert self.rate_limiter.is_allowed(customer_id, 100) is True
+
+        # Far future window (starts at 4980)
+        assert self.rate_limiter.is_allowed(customer_id, 4980) is True
+        assert self.rate_limiter.is_allowed(customer_id, 4990) is True
+        assert self.rate_limiter.is_allowed(customer_id, 5000) is True
+
+        # 4th request in the same window -> should be rejected
+        assert self.rate_limiter.is_allowed(customer_id, 5005) is False
+
+    def test_zero_time_handling(self):
+        """Test handling of time zero and early timestamps"""
+        customer_id = "user_123"
+        
+        # Window [0, 30)
+        assert self.rate_limiter.is_allowed(customer_id, 0) is True
+        assert self.rate_limiter.is_allowed(customer_id, 1) is True
+        assert self.rate_limiter.is_allowed(customer_id, 29) is True
+        assert self.rate_limiter.is_allowed(customer_id, 29) is False  # 4th request
