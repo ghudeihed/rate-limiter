@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "rate-limiter"
+version = "0.1.0"
+description = ""
+authors = ["Ghazi Hudeihed <ghazi@hudeihed.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.11.9"
+fastapi = "^0.115.14"
+uvicorn = {extras = ["standard"], version = "^0.35.0"}
+pytest = "^8.4.1"
+pytest-cov = "^6.2.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["app"]
+testpaths = ["tests"]
