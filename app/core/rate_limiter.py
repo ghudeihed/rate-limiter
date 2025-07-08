@@ -45,16 +45,15 @@ class RateLimiter:
         if not isinstance(current_time, (int, float)) or current_time < 0:
             raise ValueError("current_time must be a non-negative number")
 
+        current_time_int = int(current_time)
+        current_window_start = (current_time_int // self.time_window) * self.time_window
+
         # Get or create lock for this customer
         with self._locks_lock:
             customer_lock = self._customer_locks[customer_id]
         
-        # Now process this customer atomically - now thread-safe per customer
+        # Now process this customer atomically
         with customer_lock:   
-            # Convert float to int (floor)
-            current_time = int(current_time)
-            current_window_start = (current_time // self.time_window) * self.time_window
-            
             # Check if customer exists in our tracking
             if customer_id not in self.customers:
                 # New customer - initialize with current window and first request
