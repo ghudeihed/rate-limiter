@@ -18,7 +18,8 @@ This project implements a rate limiting system using the **Fixed Window Algorith
 │   │   └── rate_limiter.py                     # Core rate limiter implementation
 │   └── main.py                                 # FastAPI application entry point
 ├── tests/
-│   └── test_rate_limiter.py                    # Comprehensive test suite
+│   └── test_api_ping.py                        # Ping endpoint test suite
+│   └── test_rate_limiter.py                    # Rate limiter test suite 
 ├── docs/
 │   └── Take Home Assignment.docx               # Assignment documentation
 ├── pyproject.toml                             # Poetry dependencies
