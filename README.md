@@ -18,6 +18,7 @@ This project implements a rate limiting system using the **Fixed Window Algorith
 │   │   └── rate_limiter.py                     # Core rate limiter implementation
 │   └── main.py                                 # FastAPI application entry point
 ├── tests/
+│   └── conftest.py                             # Unit tests shared fixtures
 │   └── test_api_ping.py                        # Ping endpoint test suite
 │   └── test_rate_limiter.py                    # Rate limiter test suite 
 ├── docs/
