@@ -189,3 +189,112 @@ class TestRateLimiterTimeWindows:
         assert self.rate_limiter.is_allowed(customer_id, 1) is True
         assert self.rate_limiter.is_allowed(customer_id, 29) is True
         assert self.rate_limiter.is_allowed(customer_id, 29) is False  # 4th request
+
+class TestRateLimiterMultipleCustomers:
+    """Test rate limiter behavior with multiple customers"""
+    
+    def setup_method(self):
+        """Set up test fixtures before each test method"""
+        self.rate_limiter = RateLimiter(2, 10)  # 2 requests per 10 seconds
+    
+    def test_independent_rate_limits(self):
+        """Test that each customer has independent rate limits"""
+        alice = "alice"
+        bob = "bob"
+        charlie = "charlie"
+        base_time = 50
+        
+        # Each customer should be able to make their full allocation
+        assert self.rate_limiter.is_allowed(alice, base_time) is True
+        assert self.rate_limiter.is_allowed(bob, base_time) is True
+        assert self.rate_limiter.is_allowed(charlie, base_time) is True
+        
+        assert self.rate_limiter.is_allowed(alice, base_time + 1) is True
+        assert self.rate_limiter.is_allowed(bob, base_time + 1) is True
+        assert self.rate_limiter.is_allowed(charlie, base_time + 1) is True
+        
+        # Third request should be rejected for all
+        assert self.rate_limiter.is_allowed(alice, base_time + 2) is False
+        assert self.rate_limiter.is_allowed(bob, base_time + 2) is False
+        assert self.rate_limiter.is_allowed(charlie, base_time + 2) is False
+    
+    def test_simultaneous_requests_different_customers(self):
+        """Test simultaneous requests from different customers"""
+        customers = ["user_1", "user_2", "user_3", "user_4", "user_5"]
+        timestamp = 100
+        
+        # All customers make their first request at the same time
+        for customer in customers:
+            assert self.rate_limiter.is_allowed(customer, timestamp) is True
+        
+        # All customers make their second request at the same time
+        for customer in customers:
+            assert self.rate_limiter.is_allowed(customer, timestamp + 1) is True
+        
+        # All customers exceed their limit at the same time
+        for customer in customers:
+            assert self.rate_limiter.is_allowed(customer, timestamp + 2) is False
+        
+        # Verify all customers are tracked
+        assert len(self.rate_limiter.customers) == 5
+    
+    def test_customers_in_different_windows(self):
+        """Test customers making requests in different time windows"""
+        alice = "alice"
+        bob = "bob"
+        
+        # Alice makes requests in window [50, 60)
+        assert self.rate_limiter.is_allowed(alice, 50) is True
+        assert self.rate_limiter.is_allowed(alice, 51) is True
+        assert self.rate_limiter.is_allowed(alice, 52) is False  # Exceeds limit
+        
+        # Bob makes requests in window [60, 70)
+        assert self.rate_limiter.is_allowed(bob, 60) is True
+        assert self.rate_limiter.is_allowed(bob, 61) is True
+        assert self.rate_limiter.is_allowed(bob, 62) is False  # Exceeds limit
+        
+        # Verify both customers are tracked independently
+        assert len(self.rate_limiter.customers) == 2
+        assert alice in self.rate_limiter.customers
+        assert bob in self.rate_limiter.customers
+        
+        # Check Alice's state
+        window_start, request_count = self.rate_limiter.customers[alice]
+        assert window_start == 50
+        assert request_count == 2
+        
+        # Check Bob's state
+        window_start, request_count = self.rate_limiter.customers[bob]
+        assert window_start == 60
+        assert request_count == 2
+        
+        # Alice can make requests again in window [60, 70)
+        assert self.rate_limiter.is_allowed(alice, 60) is True
+        assert self.rate_limiter.is_allowed(alice, 65) is True
+        assert self.rate_limiter.is_allowed(alice, 69) is False  # Rejected
+        
+        # Check Alice's state
+        window_start, request_count = self.rate_limiter.customers[alice]
+        assert window_start == 60
+        assert request_count == 2
+        
+        # Check Bob's state
+        window_start, request_count = self.rate_limiter.customers[bob]
+        assert window_start == 60
+        assert request_count == 2
+        
+    def test_customer_isolation(self):
+        """Test that one customer's behavior doesn't affect another"""
+        alice = "alice"
+        bob = "bob"
+        base_time = 0
+        
+        # Alice exhausts her limit 
+        assert self.rate_limiter.is_allowed(alice, base_time) is True
+        assert self.rate_limiter.is_allowed(alice, base_time + 1) is True
+        assert self.rate_limiter.is_allowed(alice, base_time + 2) is False  # Exceeds limit
+        
+        # Bob should still have his full allocation
+        assert self.rate_limiter.is_allowed(bob, base_time + 2) is True
+        assert self.rate_limiter.is_allowed(bob, base_time + 3) is True
+        assert self.rate_limiter.is_allowed(bob, base_time + 4) is False
