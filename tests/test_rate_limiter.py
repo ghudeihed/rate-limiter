@@ -124,7 +124,10 @@ class TestRateLimiterBasicFunctionality:
             self.rate_limiter.is_allowed(customer_id, current_time)
             
 class TestRateLimiterTimeWindows:
+    """Test time window behavior and transitions"""
+    
     def setup_method(self):
+        """Set up test fixtures before each test method"""
         self.rate_limiter = RateLimiter(3, 30)  # 3 requests per 30 seconds
     
     def test_requests_within_same_window(self):
