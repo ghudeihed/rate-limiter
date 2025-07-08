@@ -77,7 +77,9 @@ The API will be available at:
 curl http://localhost:8000/api/v1/ping
 
 # Make multiple requests to trigger rate limiting
-for i in {1..10}; do curl http://localhost:8000/api/v1/ping; echo; done
+for i in {1..10}; do curl -X 'GET' \
+  'http://127.0.0.1:8000/api/v1/ping' \
+  -H 'accept: application/json'; echo; done
 ```
 
 ### Running Tests
