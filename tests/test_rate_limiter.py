@@ -1,7 +1,7 @@
 import pytest
 import time 
 
-from rate_limiter import RateLimiter
+from app.core.rate_limiter import RateLimiter
 
 class TestRateLimiterInitialization:
     """Test rate limiter initialization and input validation"""
