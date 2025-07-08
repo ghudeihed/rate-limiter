@@ -1,3 +1,5 @@
+import threading
+from collections import defaultdict
 from typing import Dict, Tuple, Union
 
 class RateLimiter:
@@ -22,6 +24,10 @@ class RateLimiter:
         
         # Dictionary to store customer data: customer_id -> (window_start, request_count)
         self.customers: Dict[str, Tuple[int, int]] = {}
+        
+        # Per-customer locks for fine-grained concurrency
+        self._customer_locks = defaultdict(threading.Lock)
+        self._locks_lock = threading.Lock()  # Protects the locks dict
     
     def is_allowed(self, customer_id: str, current_time: Union[int, float]) -> bool:
         """ Checks if a request is allowed for a given customer at the current time.
@@ -39,33 +45,39 @@ class RateLimiter:
         if not isinstance(current_time, (int, float)) or current_time < 0:
             raise ValueError("current_time must be a non-negative number")
 
-        # Convert float to int (floor)
-        current_time = int(current_time)
-        current_window_start = (current_time // self.time_window) * self.time_window
+        # Get or create lock for this customer
+        with self._locks_lock:
+            customer_lock = self._customer_locks[customer_id]
         
-        # Check if customer exists in our tracking
-        if customer_id not in self.customers:
-            # New customer - initialize with current window and first request
-            self.customers[customer_id] = (current_window_start, 1)
-            return True 
-        
-        # Get customer's current window data
-        window_start, request_count = self.customers[customer_id]
-        
-        # Check if we're in a new window
-        if current_window_start > window_start:
-            # New window has started, reset request count
-            self.customers[customer_id] = (current_window_start, 1)
+        # Now process this customer atomically - now thread-safe per customer
+        with customer_lock:   
+            # Convert float to int (floor)
+            current_time = int(current_time)
+            current_window_start = (current_time // self.time_window) * self.time_window
+            
+            # Check if customer exists in our tracking
+            if customer_id not in self.customers:
+                # New customer - initialize with current window and first request
+                self.customers[customer_id] = (current_window_start, 1)
+                return True 
+            
+            # Get customer's current window data
+            window_start, request_count = self.customers[customer_id]
+            
+            # Check if we're in a new window
+            if current_window_start > window_start:
+                # New window has started, reset request count
+                self.customers[customer_id] = (current_window_start, 1)
+                return True
+            
+            # Same window - check request count
+            if request_count >= self.rate:
+                # Rate limit exceeded
+                return False
+            
+            # Within rate limit, increment request count
+            self.customers[customer_id] = (window_start, request_count + 1)
             return True
-        
-        # Same window - check request count
-        if request_count >= self.rate:
-            # Rate limit exceeded
-            return False
-        
-        # Within rate limit, increment request count
-        self.customers[customer_id] = (window_start, request_count + 1)
-        return True
         
 # Example usage and testing
 if __name__ == "__main__":
