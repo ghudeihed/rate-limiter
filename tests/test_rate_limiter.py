@@ -112,15 +112,15 @@ class TestRateLimiterBasicFunctionality:
         current_time = None
         
         # Act & Assert
-        with pytest.raises(ValueError, match="current_time must be a non-negative integer"):
+        with pytest.raises(ValueError, match="current_time must be a non-negative number"):
             self.rate_limiter.is_allowed(customer_id, current_time)
         
         current_time = -100
-        with pytest.raises(ValueError, match="current_time must be a non-negative integer"):
+        with pytest.raises(ValueError, match="current_time must be a non-negative number"):
             self.rate_limiter.is_allowed(customer_id, current_time)
         
         current_time = "100"
-        with pytest.raises(ValueError, match="current_time must be a non-negative integer"):
+        with pytest.raises(ValueError, match="current_time must be a non-negative number"):
             self.rate_limiter.is_allowed(customer_id, current_time)
             
 class TestRateLimiterTimeWindows:
@@ -165,6 +165,21 @@ class TestRateLimiterTimeWindows:
         assert request_count == 3
         assert window_start == 90  # (90 // 30) * 30
     
+    def test_time_window_boundaries(self):
+        """Test behavior at exact time window boundaries"""
+        customer_id = "user_123"
+        
+        # Window [0, 30)
+        assert self.rate_limiter.is_allowed(customer_id, 0) is True
+        assert self.rate_limiter.is_allowed(customer_id, 29) is True
+        assert self.rate_limiter.is_allowed(customer_id, 29.9) is True
+        assert self.rate_limiter.is_allowed(customer_id, 29.99) is False  # 4th request, rejected
+        
+        # Window [30, 60) - should reset
+        assert self.rate_limiter.is_allowed(customer_id, 30) is True     # New window
+        assert self.rate_limiter.is_allowed(customer_id, 59) is True
+        assert self.rate_limiter.is_allowed(customer_id, 59.9) is True
+            
     def test_time_rollovers_and_resets(self):
         """Test various time rollover scenarios"""
         customer_id = "user_123"
@@ -298,3 +313,77 @@ class TestRateLimiterMultipleCustomers:
         assert self.rate_limiter.is_allowed(bob, base_time + 2) is True
         assert self.rate_limiter.is_allowed(bob, base_time + 3) is True
         assert self.rate_limiter.is_allowed(bob, base_time + 4) is False
+
+class TestRateLimiterEdgeCases:
+    """Test edge cases and boundary conditions"""
+    
+    def test_very_high_rate_limit(self):
+        """Test rate limiter with very high rate limits"""
+        rate_limiter = RateLimiter(1000, 60)
+        customer_id = "heavy_user"
+
+        # Simulate 1000 requests within the same window
+        for _ in range(1000):
+            assert rate_limiter.is_allowed(customer_id, 100) is True
+
+        # 1001st request should be rejected (still same window)
+        assert rate_limiter.is_allowed(customer_id, 100) is False
+
+    
+    def test_very_short_time_window(self):
+        """Test rate limiter with very short time windows"""
+        rate_limiter = RateLimiter(2, 1)  # 2 requests per 1 second
+        customer_id = "user_123"
+        
+        # Window [100, 101)
+        assert rate_limiter.is_allowed(customer_id, 100) is True
+        assert rate_limiter.is_allowed(customer_id, 100.5) is True
+        assert rate_limiter.is_allowed(customer_id, 100.9) is False
+        
+        # Window [101, 102)
+        assert rate_limiter.is_allowed(customer_id, 101) is True
+        assert rate_limiter.is_allowed(customer_id, 101.5) is True
+        assert rate_limiter.is_allowed(customer_id, 101.9) is False
+    
+    def test_single_request_rate_limit(self):
+        """Test rate limiter with single request per window"""
+        rate_limiter = RateLimiter(1, 60)
+        customer_id = "user_123"
+        
+        assert rate_limiter.is_allowed(customer_id, 0) is True
+        assert rate_limiter.is_allowed(customer_id, 30) is False
+        assert rate_limiter.is_allowed(customer_id, 59) is False
+        assert rate_limiter.is_allowed(customer_id, 60) is True  # New window
+    
+    def test_floating_point_time_values(self):
+        """Test handling of floating point time values"""
+        rate_limiter = RateLimiter(3, 10)
+        customer_id = "user_123"
+        
+        # Test with various floating point values
+        assert rate_limiter.is_allowed(customer_id, 10.1) is True
+        assert rate_limiter.is_allowed(customer_id, 10.5) is True
+        assert rate_limiter.is_allowed(customer_id, 10.9) is True
+        assert rate_limiter.is_allowed(customer_id, 19.9) is False
+        
+        # New window should reset
+        assert rate_limiter.is_allowed(customer_id, 20.0) is True
+    
+    def test_boundary_burst_behavior(self):
+        """Test the boundary burst behavior of fixed window algorithm"""
+        rate_limiter = RateLimiter(3, 10)
+        customer_id = "user_123"
+        
+        # Make 3 requests at the end of window [10, 20)
+        assert rate_limiter.is_allowed(customer_id, 19) is True
+        assert rate_limiter.is_allowed(customer_id, 19.5) is True
+        assert rate_limiter.is_allowed(customer_id, 19.9) is True
+        
+        # Immediately make 3 more requests at start of window [20, 30)
+        assert rate_limiter.is_allowed(customer_id, 20) is True
+        assert rate_limiter.is_allowed(customer_id, 20.1) is True
+        assert rate_limiter.is_allowed(customer_id, 20.2) is True
+        
+        # This demonstrates the "burst" issue where 6 requests
+        # can be made in ~1 second at window boundaries
+        assert rate_limiter.is_allowed(customer_id, 20.3) is False

@@ -1,5 +1,4 @@
-import time
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 class RateLimiter:
     """Class that implements rate limiting with a fixed window algorithm."""
@@ -24,23 +23,24 @@ class RateLimiter:
         # Dictionary to store customer data: customer_id -> (window_start, request_count)
         self.customers: Dict[str, Tuple[int, int]] = {}
     
-    def is_allowed(self, customer_id: str, current_time: int) -> bool: 
+    def is_allowed(self, customer_id: str, current_time: Union[int, float]) -> bool:
         """ Checks if a request is allowed for a given customer at the current time.
 
         Args:
             customer_id (str): unique identifier for the customer making the request
-            current_time (datetime): the current timestamp in seconds since the epoch
+            current_time (int | float): the current timestamp in seconds since the epoch
         Returns:
             bool: true if the request is allowed, false if it should be rejected
         Raises:
-            ValueError: If customer_id is null or empty or current_time is not a positive integer
+            ValueError: If customer_id is invalid or current_time is negative.
         """
         if not customer_id or not isinstance(customer_id, str):
             raise ValueError("customer_id must be a non-empty string")
-        if not isinstance(current_time, int) or current_time < 0:
-            raise ValueError("current_time must be a non-negative integer")
-        
-        # Calculate the current window start time
+        if not isinstance(current_time, (int, float)) or current_time < 0:
+            raise ValueError("current_time must be a non-negative number")
+
+        # Convert float to int (floor)
+        current_time = int(current_time)
         current_window_start = (current_time // self.time_window) * self.time_window
         
         # Check if customer exists in our tracking
